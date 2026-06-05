@@ -4,4 +4,3 @@ __pycache__/
 /tmp/upstream-results/
 *.egg-info/
 .venv/
-god_mode.txt
