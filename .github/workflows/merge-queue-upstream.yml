@@ -1,0 +1,56 @@
+name: Merge Queue - Upstream Tests
+
+# Runs ONLY in the merge queue. When a PR author clicks "Merge when ready",
+# GitHub forms a temporary merge-group branch and fires `merge_group`; this
+# workflow runs the upstream-tests (simulated here), aggregates one summary for
+# ALL tests, and gates the merge on the failure threshold.
+#
+# The job `upstream-gate` is the REQUIRED status check the ruleset enforces.
+on:
+  merge_group:
+
+permissions:
+  contents: read
+
+env:
+  # Primary threshold source: Actions repo variable. Empty when unset → the gate
+  # script falls back to config/upstream_gate_config.json, then to its built-in 5.
+  UPSTREAM_FAILURE_THRESHOLD: ${{ vars.UPSTREAM_FAILURE_THRESHOLD }}
+  # Number of simulated matrix nodes; also drives the completeness check.
+  SIM_NODES: "3"
+
+jobs:
+  upstream-gate:
+    name: upstream-gate (pre-merge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Simulate upstream test run (random 1-8 failures)
+        run: |
+          python3 scripts/gen_synthetic_reports.py \
+            --output-dir /tmp/upstream-results \
+            --nodes "${SIM_NODES}"
+
+      - name: Aggregate results (one summary for all tests)
+        run: |
+          python3 scripts/aggregate_results.py /tmp/upstream-results \
+            --summary-out /tmp/upstream-results/summary.json
+
+      - name: Gate on failure threshold
+        run: |
+          python3 scripts/upstream_gate.py \
+            --summary /tmp/upstream-results/summary.json \
+            --expected-nodes "${SIM_NODES}"
+
+      - name: Upload aggregated results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-results
+          path: /tmp/upstream-results/
+          retention-days: 7

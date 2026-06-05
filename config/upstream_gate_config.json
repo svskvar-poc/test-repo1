@@ -1,0 +1,4 @@
+{
+  "failure_threshold": 5,
+  "merge_queue_length": 1
+}
