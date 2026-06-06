@@ -30,11 +30,18 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Simulate upstream test run (random 1-8 failures)
+      - name: Simulate upstream test run (always 6-8 failures)
         run: |
+          # Force the simulated run to always land above the gate threshold:
+          # pick a random failure count in the inclusive range [6, 8] so that
+          # failed+error always exceeds the default threshold (5) and the
+          # merge-queue gate blocks the merge.
+          FAILURES=$(( (RANDOM % 3) + 6 ))
+          echo "Injecting ${FAILURES} synthetic failures (range 6-8)."
           python3 scripts/gen_synthetic_reports.py \
             --output-dir /tmp/upstream-results \
-            --nodes "${SIM_NODES}"
+            --nodes "${SIM_NODES}" \
+            --failures "${FAILURES}"
 
       - name: Aggregate results (one summary for all tests)
         run: |
